@@ -5,6 +5,7 @@ const app=express()
 const {google}=require("googleapis")
 const ejs=require("ejs")
 const path=require("path")
+const multer=require("multer")
 
 const oAuthGoogleClient=new google.auth.OAuth2(process.env.CLIENT_ID,process.env.CLIENT_SECRET,process.env.REDIRECT_URI)
 oAuthGoogleClient.setCredentials({refresh_token:process.env.REFRESH_TOKEN})
@@ -18,15 +19,31 @@ app.get("/",(req,res)=>{
         msg:undefined
     })
 })
+const storage=multer.diskStorage({
+    destination:"./public/uploads",
+    filename:function(req,file,cb){
+cb(null,file.fieldname+"-"+Date.now()+path.extname(file.originalname))
+    }
+})
 
+const uploads=multer({
+    storage:storage,
+}).single('file')
 app.post("/send",async (req,res)=>{
+
     try {
+        uploads(req,res,async(err)=>{
+        if(err){
+            res.send("Something went wrong")
+        }else{
+            let path=req.file.path
+      
         let output=`
     <h1>Here is my Contact Details. </h1>
     <ul>
     <li>Name: ${req.body.name}</li>
     <li>Company: ${req.body.company}</li>
-    <li>Email: ${req.body.email}</li>
+   
     <li>PhoneNumber:${req.body.phone}</li>
     <h3>Your Message</h3>
     <p>${req.body.message}</p>
@@ -45,10 +62,14 @@ app.post("/send",async (req,res)=>{
             accessToken:accessToken
         }
     })
+    let {email1,email2,email3,email4}=req.body
     const emailOptions={
         from:`NodeMailer Contact  <${process.env.USER}>`,
-        to:`${req.body.email}`,
+        to:[email1,email2,email3,email4],
         subject:"Nodemailer Contact Form",
+        attachments:[
+            {path:path}
+        ],
         text:"CHecking ",
         html:output
     }
@@ -60,10 +81,13 @@ app.post("/send",async (req,res)=>{
             })
         }else{
             res.render("contact",{
-                msg:"Message Sent Sucessfully"
+                msg:err
             })
+            console.log(err);
         }
     })
+}
+})
         
     } catch (error) {
         console.log(error);
